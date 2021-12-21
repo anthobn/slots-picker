@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<thead>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/css/slots-picker.css">
+    <title>Slots Picker</title>
+</thead>
+
+<body>
+    <div id="slots-picker">
+        <!-- JS SCRIPT WILL BE FILL THIS CONTAINER -->
+    </div>
+    <script src="/js/slots-picker.js"></script>
+    <script>
+        new slotsPicker({
+            slotsPickerEl: "slots-picker",
+            multipleSelector: true,
+            fromDate: new Date(1628892000000),
+            showXdays: 7,
+            selectedSlots: [1628947200000],
+            msg: {
+                notAvailableSlots: {
+                    p: "Aucun slot disponible",
+                    title: "Cliquer ici pour consulter la disponibilité ",
+                },
+                slots: {
+                    title: "Cliquer sur ce créneau pour réserver...",
+                },
+            },
+            availableSlots: {
+                slots: {
+                    1628892000000: ["09:00", "10:30", "15:20", "16:30"],
+                    1628978400000: ["08:30", "10:30", "15:20", "15:50"],
+                    1629064800000: ["09:00", "10:30", "15:20"],
+                    1629151200000: ["10:00", "10:30", "15:10"],
+                    1629237600000: ["06:00", "10:30", "15:20", "16:10", "17h30", "18h00", "19:00"],
+                    1629324000000: ["09:00", "10:30", "15:20"],
+                    1629410400000: ["09:20", "10:30", "15:20"],
+                },
+                nextAvailableSlot: 1628892000000,
+            },
+            getSlots: function (fromDate) {
+                console.log("GET SLOTS FROM BACKEND FROM FOLLOWING DATE : " + fromDate)
+
+                function addDay(date, x) {
+                    return new Date(new Date(date).setDate(date.getDate() + x)).getTime()
+                }
+
+                return {
+                    slots: {
+                        [fromDate.getTime()]: ["01:00", "10:00", "11:00", "12:00", "13:00"],
+                        [addDay(fromDate, 1)]: ["02:00", "10:30", "15:20"],
+                        [addDay(fromDate, 2)]: ["03:00", "10:30", "15:20"],
+                        [addDay(fromDate, 3)]: ["04:00", "10:30", "15:20"],
+                        [addDay(fromDate, 4)]: ["05:00", "10:30", "15:20"],
+                        [addDay(fromDate, 5)]: ["06:00", "10:30", "15:20"],
+                        [addDay(fromDate, 6)]: ["07:00", "10:30", "15:20"],
+                    },
+                    nextAvailableSlot: fromDate.getTime(),
+                }
+            },
+            slotsOnClick: function (eventSlot, selectedSlots) {
+                if (eventSlot.isNewSelect) {
+                    console.log("New slot selected : " + eventSlot.date);
+                } else {
+                    console.log("New slot unselected : " + eventSlot.date);
+                }
+                console.log("Slots selected are now : " + selectedSlots);
+            },
+        }).init();
+    </script>
+</body>
+
+</html>
