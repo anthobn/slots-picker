@@ -13,8 +13,9 @@
     <div id="slots-picker">
         <!-- JS SCRIPT WILL BE FILL THIS CONTAINER -->
     </div>
-    <script src="/js/slots-picker.js"></script>
-    <script>
+    <script type="module">
+        import { slotsPicker } from "./js/slots-picker.js"
+
         new slotsPicker({
             slotsPickerEl: "slots-picker",
             multipleSelector: true,
