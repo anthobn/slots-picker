@@ -29,6 +29,13 @@ export class slotsPicker {
   };
 
   constructor(settings) {
+    //add X days to one DT object
+    Date.prototype.addDays = function (days) {
+      let date = new Date(this.valueOf());
+      date.setDate(date.getDate() + days);
+      return date;
+    };
+
     //apply personnal settings in property of this object unless personnal settings is not defined
     for (const [key, value] of Object.entries(this.default)) {
       if (settings && Object.hasOwnProperty.call(settings, key)) {
@@ -62,37 +69,25 @@ export class slotsPicker {
 
     //add the month name and year on the top
     let month = document.getElementById("month-name");
-    month.innerHTML = this.fromDate.toLocaleString("default", {
+    month.innerHTML = this.fromDate.toLocaleDateString("default", {
       month: "long",
       year: "numeric",
     });
 
-    //push all available slots in slots array
-    this.pushAvSlotsInSlotsArray(this.availableSlots);
+    //if there is no already slots filled
+    if (!this.slots.length) {
+      //push all available slots in slots array
+      this.pushAvSlotsInSlotsArray(this.availableSlots);
+    }
 
     //browse each days and check if slots are available for this day.
     this.dates.forEach((day) => {
-      let date = new Date(Number(day));
-      let slotsToday = [];
-      let el;
+      const endDay = new Date(new Date(day).setHours(23, 59, 59, 59));
 
-      if ((el = this.slots.find((o) => Number(o.date) === day))) {
-        slotsToday = el.slots;
-      } else {
-        //if the getSlots function is defined, get the slots from the backend with custom getSlots given function
-        if (typeof this.getSlots === "function") {
-          let getSlots = this.getSlots(date);
+      //get all slots for this day
+      const slotsToday = this.slots.filter((o) => o >= day && o <= endDay);
 
-          //push the new slots received in slots array
-          this.pushAvSlotsInSlotsArray(getSlots);
-
-          if ((el = this.slots.find((o) => Number(o.date) === day))) {
-            slotsToday = el.slots;
-          }
-        }
-      }
-
-      let col = this.makeCol(date, slotsToday);
+      let col = this.makeCol(day, slotsToday);
       slotsContainer.appendChild(col);
     });
 
@@ -117,10 +112,13 @@ export class slotsPicker {
     let emptyArray = 0;
 
     this.dates.forEach((day) => {
-      let el = this.slots.find((o) => Number(o.date) === day);
+      const endDay = new Date(new Date(day).setHours(23, 59, 59, 59));
+
+      //get all slots for this day
+      let el = this.slots.filter((o) => o >= day && o <= endDay);
 
       //if there is no slots defined or if the array of slots is empty
-      if (!el || !el.slots.length) {
+      if (!el || !el.length) {
         emptyArray++;
       }
     });
@@ -152,7 +150,7 @@ export class slotsPicker {
       //create link
       let a = document.createElement("a");
       let dateTxt = document.createTextNode(
-        new Date(this.nextAvailableSlot).toLocaleString("default", {
+        new Date(this.nextAvailableSlot).toLocaleDateString("default", {
           weekday: "long",
           day: "2-digit",
           month: "long",
@@ -162,7 +160,7 @@ export class slotsPicker {
       a.appendChild(dateTxt);
       a.href = "#";
       a.title = this.msg.notAvailableSlots.title;
-      a.id = this.nextAvailableSlot;
+      a.id = this.nextAvailableSlot.getTime();
       a.addEventListener("click", function (event) {
         inst.goToNextAvailability(event);
       });
@@ -175,12 +173,13 @@ export class slotsPicker {
 
   //this function will return X days (depending showXdays property) in an array from the fromDate property
   getDates() {
+    //update fromDate to 00:00 local time
+    this.fromDate = new Date(this.fromDate.setHours(0, 0, 0, 0));
+
     let dates = [];
 
     for (let i = 0; i < this.showXdays; i++) {
-      let date = new Date(
-        new Date(this.fromDate).setDate(this.fromDate.getDate() + i)
-      ).setHours(0, 0, 0, 0);
+      const date = new Date(this.fromDate).addDays(i);
       dates.push(date);
     }
 
@@ -190,14 +189,14 @@ export class slotsPicker {
   //push available slots in slots array and nextAvailableSlot if is defined
   pushAvSlotsInSlotsArray(avSlots) {
     if (avSlots) {
+      this.slots = [];
       if (avSlots["slots"]) {
-        for (const [key, value] of Object.entries(avSlots["slots"])) {
-          const el = { date: key, slots: value };
-          this.slots.push(el);
-        }
+        avSlots["slots"].forEach((slot) => {
+          this.slots.push(new Date(slot.begin));
+        });
       }
       if (avSlots["nextAvailableSlot"]) {
-        this.nextAvailableSlot = avSlots["nextAvailableSlot"];
+        this.nextAvailableSlot = new Date(avSlots["nextAvailableSlot"]);
       }
     }
   }
@@ -230,23 +229,24 @@ export class slotsPicker {
       slotsDiv.className = "slots";
 
       slots.forEach((slot) => {
-        //DT
-        let hour = slot.split(":");
-        let slotDT = date.setHours(hour[0], hour[1]);
+        let displayHour = slot.toLocaleTimeString("default", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
 
         //create clickable slot
         let a = document.createElement("a");
-        let text = document.createTextNode(slot);
+        let text = document.createTextNode(displayHour);
         a.appendChild(text);
         a.href = "#";
         a.title = inst.msg.slots.title;
-        a.id = slotDT;
+        a.id = slot.getTime();
         a.addEventListener("click", function (event) {
           inst.slotSelected(event);
         });
 
         //if this slot is selected, mark active class
-        if (inst.selectedSlots.includes(slotDT)) {
+        if (inst.selectedSlots.some((o) => o === slot.toISOString())) {
           a.className = "active";
         }
 
@@ -275,19 +275,21 @@ export class slotsPicker {
     let eventSlot = { date: slotDT, isNewSelect: true };
 
     //if slot have already selected by user, user request to unselect the slot
-    if (this.selectedSlots.includes(slotDT.getTime())) {
+    if (this.selectedSlots.includes(slotDT.toISOString())) {
       eventSlot.isNewSelect = false;
       event.target.removeAttribute("class");
 
       //remove selected slot from the selectedSlots array
-      let index = this.selectedSlots.indexOf(slotDT.getTime());
+      let index = this.selectedSlots.indexOf(slotDT.toISOString());
       if (index !== -1) {
         this.selectedSlots.splice(index, 1);
       }
     } else {
       //if there is not possible multipleSelector, remove old slot selection
       if (!this.multipleSelector && this.selectedSlots.length) {
-        let slot = document.getElementById(this.selectedSlots[0]);
+        let slot = document.getElementById(
+          new Date(this.selectedSlots[0]).getTime()
+        );
 
         //if the slot is in the document (the slot can be disappear when the user navigate with the arrows)
         if (slot) {
@@ -298,13 +300,23 @@ export class slotsPicker {
       }
 
       //push the slot and mark as active
-      this.selectedSlots.push(slotDT.getTime());
+      this.selectedSlots.push(slotDT.toISOString());
       event.target.setAttribute("class", "active");
     }
 
     //if custom slotsOnClick function given, send event to slotsOnClick custom function
     if (typeof this.slotsOnClick === "function") {
       this.slotsOnClick(eventSlot, this.selectedSlots);
+    }
+  }
+
+  callNewDatas(date) {
+    //if the getSlots function is defined, get the slots from the backend with custom getSlots given function
+    if (typeof this.getSlots === "function") {
+      const getSlots = this.getSlots(date);
+
+      //push the new slots received in slots array
+      this.pushAvSlotsInSlotsArray(getSlots);
     }
   }
 
@@ -317,9 +329,8 @@ export class slotsPicker {
 
   //event onclick on the previous nav arrow
   previous() {
-    this.fromDate = new Date(
-      new Date(this.fromDate).setDate(this.fromDate.getDate() - this.showXdays)
-    );
+    this.fromDate = this.fromDate.addDays(-this.showXdays);
+    this.callNewDatas(this.fromDate);
     this.init();
   }
 
@@ -328,10 +339,11 @@ export class slotsPicker {
     if (date) {
       this.fromDate = date;
     } else {
-      let lastDate = new Date(this.dates[this.dates.length - 1]);
+      const lastDate = this.dates[this.dates.length - 1];
       //add one day to last day
-      this.fromDate = new Date(lastDate.setDate(lastDate.getDate() + 1));
+      this.fromDate = lastDate.addDays(1);
     }
+    this.callNewDatas(this.fromDate);
     this.init();
   }
 }
